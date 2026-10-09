@@ -1,0 +1,9 @@
+node_modules/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
+web/e2e/shots/
+*.log

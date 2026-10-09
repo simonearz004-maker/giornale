@@ -1,0 +1,25 @@
+name: Manutenzione
+
+# GitHub sospende i job pianificati dei repository pubblici dopo 60 giorni senza attività.
+# Una volta a settimana questo job registra un controllo e mantiene attivo l'aggiornamento quotidiano.
+on:
+  schedule:
+    - cron: "23 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mantieni-attivo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Registra il controllo settimanale
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/ultimo-controllo.txt
+          git config user.name "giornale-bot"
+          git config user.email "giornale-bot@users.noreply.github.com"
+          git add .github/ultimo-controllo.txt
+          git commit -m "Controllo settimanale" || exit 0
+          git push

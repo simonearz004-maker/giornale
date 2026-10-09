@@ -1,0 +1,48 @@
+name: Edizione quotidiana
+
+# Parte ogni ora; la pipeline pubblica solo agli orari scelti nelle Impostazioni del sito
+# (e recupera fino a 6 ore dopo se un'esecuzione salta). Le esecuzioni fuori orario durano pochi secondi.
+on:
+  schedule:
+    - cron: "7 * * * *"
+  workflow_dispatch:
+    inputs:
+      subito:
+        description: "Pubblica subito, ignorando l'orario"
+        type: boolean
+        default: true
+
+concurrency:
+  group: edizione
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  edizione:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: pipeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pipeline/requirements.txt
+      - run: pip install -r requirements.txt
+      - name: Raccolta, verifica e pubblicazione
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          # Riserva a pagamento: resta spenta finché il secret non esiste.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Facoltativo: elenco dei modelli Gemini da provare in ordine (variabile del repository).
+          GEMINI_MODELS: ${{ vars.GEMINI_MODELS }}
+          FORCE_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.subito }}
+          RUN_TRIGGER: ${{ github.event_name }}
+        run: python -m giornale.run
