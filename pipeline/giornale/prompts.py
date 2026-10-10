@@ -46,7 +46,7 @@ CARD_SYSTEM = """Scrivi schede di notizie per un quotidiano personale in italian
 
 REGOLE DI VERITÀ (inderogabili):
 1. Usa SOLO i materiali forniti ([S1], [S2]… sono le fonti di oggi; [P1]… sono schede già pubblicate nei giorni scorsi, utilizzabili solo per il contesto). Non aggiungere fatti, nomi, date, cifre o dichiarazioni che non vi compaiono, nemmeno se li conosci.
-2. Ogni numero che scrivi (in titolo, sintesi, perche_importa, dati, contesto, prossimi_passi, affermazioni) deve comparire nei materiali. Non calcolare differenze, somme o percentuali nuove: riporta solo le cifre presenti.
+2. Ogni numero che scrivi (in titolo, sintesi, perche_importa, dati, contesto, prossimi_passi, affermazioni) deve comparire nei materiali. Non calcolare differenze, somme o percentuali nuove: riporta solo le cifre presenti. Riporta anche le parole che accompagnano il numero esattamente come nella fonte: "circa", "oltre", "fino a", "almeno", "entro", "subito", "questo mese" cambiano il significato del dato e non vanno aggiunte, tolte o sostituite.
 3. Ogni affermazione importante va in "affermazioni" con le fonti che la sostengono (es. ["S1","S3"]). Indica la natura: "fatto" (verificabile), "dichiarazione" (qualcuno lo afferma), "interpretazione" (lettura di una testata o di un analista).
 4. Distingui sempre i fatti dalle dichiarazioni: "il Governo sostiene che…", "secondo l'ISTAT…".
 5. Se le fonti si contraddicono, spiegalo in "divergenze".
@@ -108,6 +108,7 @@ def card_user(category_name: str, materials: list[dict], previous: list[dict], t
 # ---------------------------------------------------------------------------
 CHECK_SYSTEM = """Sei un verificatore (fact-checker) rigoroso. Confronti una scheda di notizia con i materiali da cui è stata scritta.
 Segnala come problema ogni affermazione, numero, nome, data o attribuzione della scheda che NON è sostenuto dai materiali, che li travisa, che presenta come certo ciò che è ipotetico, o che attribuisce a una fonte qualcosa che quella fonte non dice.
+Controlla con attenzione le parole che accompagnano i numeri e i tempi: se la fonte dice "300.000 tonnellate questo mese" e la scheda scrive "oltre 300.000 tonnellate subito", è un problema (quantità e tempi alterati).
 La sezione "spiegazione" può contenere conoscenze generali su come funziona un concetto: segnalala solo se contiene fatti specifici sulla notizia non presenti nei materiali, o se contiene errori concettuali.
 Non segnalare questioni di stile. Rispondi solo con JSON: {"fedele": true|false, "problemi": [{"campo": "…", "testo": "…", "motivo": "…"}]}"""
 
