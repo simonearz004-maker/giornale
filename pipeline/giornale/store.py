@@ -40,6 +40,7 @@ class BaseStore:
     def stories_for_edition(self, edition_id: str) -> list[dict]: ...
     def insert_story(self, story: dict, sources: list[dict]) -> str: ...
     def update_story(self, story_id: str, fields: dict) -> None: ...
+    def replace_story(self, story_id: str, story: dict, sources: list[dict]) -> None: ...
     # --- glossario ---
     def glossary_all(self) -> list[dict]: ...
     def insert_glossary(self, entry: dict) -> str: ...
@@ -114,7 +115,7 @@ class SupabaseStore(BaseStore):
         since = (date.today() - timedelta(days=days)).isoformat()
         return self._get("stories", {
             "edition_date": f"gte.{since}",
-            "select": "id,title,summary,context,thread_id,edition_date,category_slug,verification_level",
+            "select": "id,title,summary,context,thread_id,edition_date,category_slug,verification_level,is_update",
             "order": "created_at.desc", "limit": "300"})
 
     def recent_source_urls(self, days: int) -> set[str]:
@@ -134,6 +135,12 @@ class SupabaseStore(BaseStore):
 
     def update_story(self, story_id: str, fields: dict) -> None:
         self._patch("stories", {"id": f"eq.{story_id}"}, fields)
+
+    def replace_story(self, story_id: str, story: dict, sources: list[dict]) -> None:
+        self._patch("stories", {"id": f"eq.{story_id}"}, story)
+        self._req("DELETE", "/story_sources", params={"story_id": f"eq.{story_id}"})
+        if sources:
+            self._insert("story_sources", [{**src, "story_id": story_id} for src in sources])
 
     def glossary_all(self) -> list[dict]:
         return self._get("glossary", {"select": "id,slug,term,aliases"})
@@ -232,6 +239,12 @@ class MemoryStore(BaseStore):
         for s in self.stories:
             if s["id"] == story_id:
                 s.update(fields)
+
+    def replace_story(self, story_id, story, sources):
+        self.update_story(story_id, story)
+        self.story_sources = [x for x in self.story_sources if x["story_id"] != story_id]
+        for src in sources:
+            self.story_sources.append({"id": str(uuid.uuid4()), **src, "story_id": story_id})
 
     def glossary_all(self): return copy.deepcopy(self.glossary)
 

@@ -232,10 +232,12 @@ def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fe
 
     # 3. Selezione
     recent = store.recent_stories(4)
-    threads, thread_map = [], {}
+    threads, thread_map, same_day_base = [], {}, {}
     for n, s in enumerate(recent[:60], start=1):
         tid = f"T{n}"
         thread_map[tid] = s
+        if s["edition_date"] == today.isoformat():
+            same_day_base[tid] = s
         threads.append(f"{tid} | {s['edition_date']} | {s['category_slug']} | {s['title']}")
 
     llm = llm_factory(int(settings.get("max_requests_per_run") or 60))
@@ -271,12 +273,13 @@ def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fe
         if set(ev.gruppi) & used_cluster_ids:
             continue
         cat = cat_by_slug[ev.categoria]
-        if per_cat[ev.categoria] >= cat["max_items"]:
+        if per_cat[ev.categoria] >= cat["max_items"] and not (ev.seguito_di and ev.seguito_di in same_day_base):
             continue
         lead_title = by_id[ev.gruppi[0]].lead.title
-        if _same_story(lead_title, existing):
+        if _same_story(lead_title, existing) and not (ev.seguito_di and ev.seguito_di in same_day_base):
             continue
-        per_cat[ev.categoria] += 1
+        if not (ev.seguito_di and ev.seguito_di in same_day_base):
+            per_cat[ev.categoria] += 1
         used_cluster_ids |= set(ev.gruppi)
         chosen.append(ev)
 
@@ -339,6 +342,18 @@ def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fe
             "event_date": card.data_evento[:10] if card.data_evento else None,
             "model_used": model_name,
         }
+        same_day = same_day_base.get(ev.seguito_di) if ev.seguito_di else None
+        if same_day:
+            # Stesso fatto già pubblicato oggi: si aggiorna quella scheda (scritta tenendo conto della
+            # versione precedente) invece di pubblicarne una seconda.
+            story["verification_notes"] = notes + [
+                f"Scheda aggiornata alle {now_local.strftime('%H:%M')} con nuovi sviluppi."]
+            story["is_update"] = bool(same_day.get("is_update"))
+            store.replace_story(same_day["id"], story, story_sources)
+            existing[:] = [x for x in existing if x.get("id") != same_day["id"]]
+            existing.append({**story, "id": same_day["id"]})
+            out.published.append(same_day["id"])
+            continue
         sid = store.insert_story(story, story_sources)
         existing.append({**story, "id": sid})
         out.published.append(sid)

@@ -77,3 +77,18 @@ def test_pipeline_su_postgrest():
     assert intruder.get("/stories").json() == []
     # le notizie già usate non vengono riproposte nella stessa giornata
     assert store.recent_source_urls(4) >= {"https://www.istat.it/x", "https://www.ansa.it/y"}
+
+
+def test_sostituzione_scheda_su_postgrest():
+    store = make_store()
+    _reset(store)
+    ed = store.get_or_create_edition(__import__("datetime").date(2026, 10, 10))
+    base = {"edition_id": ed["id"], "edition_date": "2026-10-10", "category_slug": "banche", "title": "Vecchio titolo",
+            "summary": "s", "verification_level": "fonte_singola"}
+    sid = store.insert_story(base, [{"ref": "S1", "source_name": "A", "title": "a", "url": "https://a.it/1"}])
+    store.replace_story(sid, {**base, "title": "Nuovo titolo", "verification_notes": ["Scheda aggiornata"]},
+                        [{"ref": "S1", "source_name": "B", "title": "b", "url": "https://b.it/2"},
+                         {"ref": "S2", "source_name": "C", "title": "c", "url": "https://c.it/3"}])
+    rows = store._get("stories", {"select": "id,title,story_sources(url)"})
+    assert len(rows) == 1 and rows[0]["title"] == "Nuovo titolo"
+    assert sorted(x["url"] for x in rows[0]["story_sources"]) == ["https://b.it/2", "https://c.it/3"]

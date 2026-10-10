@@ -5,6 +5,7 @@ I contenuti di questi test sono FITTIZI e servono solo a verificare i controlli.
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, datetime, timedelta, timezone
 
 import httpx
@@ -358,3 +359,53 @@ def test_tetto_di_tempo():
     assert any("Tempo massimo" in e for e in out.errors)
     assert any("in tempo" in r["motivo"] for r in out.rejections)
     assert store.editions, "l'edizione resta registrata anche se parziale"
+
+
+def test_seguito_stesso_giorno_aggiorna_la_scheda():
+    """Un nuovo sviluppo di un fatto già pubblicato oggi aggiorna quella scheda, senza duplicarla."""
+    store = _store()
+    llm_factory = lambda n: LLM([FakeProvider("f", _script())], n, 0, sleep=lambda s: None)
+    run_pipeline(store, Config(force=True), fetcher=_fetcher(store), reader=FakeReader(), llm_factory=llm_factory,
+                 now_utc=NOW)
+    assert len(store.stories) == 1
+    first_id = store.stories[0]["id"]
+
+    later = NOW + timedelta(hours=2)
+    new_items = {"ISTAT": [Item("", "ISTAT", "primaria", True, False, "Prezzi al consumo settembre 2026, nota di approfondimento",
+                                "https://www.istat.it/x2", "Inflazione al 2,4%", later - timedelta(minutes=30))]}
+
+    def fetch(sources):
+        res = []
+        for s in sources:
+            its = new_items.get(s["name"], [])
+            for i in its:
+                i.source_id = s["id"]
+            res.append(FeedResult(s, its, "ok"))
+        return res
+
+    class Reader2(FakeReader):
+        def read(self, url, allow):
+            if url == "https://www.istat.it/x2":
+                return (MATERIALS[0]["text"] + " Confermato il dato." + " " * 300).strip(), True
+            return super().read(url, allow)
+
+    def fn(system, user):
+        if system == prompts.SELECTION_SYSTEM:
+            assert "T1 |" in user, "la scheda di oggi deve essere proposta come filo da seguire"
+            cid = [l.split(" |")[0] for l in user.splitlines() if re.match(r"C\d+ \|", l)][0]
+            return json.dumps({"eventi": [{"gruppi": [cid], "categoria": "economia-italiana", "rilevanza": 5,
+                                           "seguito_di": "T1"}]})
+        if system == prompts.CARD_SYSTEM:
+            return json.dumps(good_card(titolo="L'inflazione sale al 2,4%: confermato il dato di settembre",
+                                        affermazioni=[{"testo": "Inflazione al 2,4%", "fonti": ["S1"]}],
+                                        dati=[{"etichetta": "Inflazione", "valore": "2,4%", "periodo": "settembre 2026", "fonte": "S1"}]))
+        return _script()(system, user)
+
+    out = run_pipeline(store, Config(force=True), fetcher=fetch, reader=Reader2(),
+                       llm_factory=lambda n: LLM([FakeProvider("f", fn)], n, 0, sleep=lambda s: None), now_utc=later)
+    assert out.published == [first_id], (out.errors, out.rejections, out.items_fetched)
+    assert len(store.stories) == 1, "nessun doppione nella stessa edizione"
+    st = store.stories[0]
+    assert st["title"].endswith("confermato il dato di settembre")
+    assert any("aggiornata" in n for n in st["verification_notes"])
+    assert [x["url"] for x in store.story_sources] == ["https://www.istat.it/x2"]

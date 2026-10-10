@@ -60,8 +60,8 @@ STILE:
 - "sintesi": 3-6 frasi. Cosa è successo, chi è coinvolto, quando, i dati principali e perché conta. Linguaggio colloquiale e preciso, niente burocratese.
 - "perche_importa": solo i soggetti davvero toccati (famiglie, imprese, banche, investitori, conti pubblici, mercati, economia italiana, economia internazionale). Per ciascuno, "stato": "osservato" se l'effetto è già in corso secondo le fonti, "possibile" se è un effetto futuro.
 - "spiegazione" (💡 Te lo spiego in parole semplici): inseriscila SOLO se la notizia contiene un concetto non immediato (spread, deficit, tassi BCE, dazi, OPA, CET1…). Qui puoi usare conoscenze generali per spiegare COME FUNZIONA il concetto, ma non per aggiungere fatti sulla notizia. Gli esempi numerici devono essere chiaramente ipotetici e iniziare con "Per esempio" o "Esempio:". Se non serve, null.
-- "dati": cifre significative con etichetta, valore, periodo di riferimento e fonte. Non mettere a confronto valori non omogenei.
-- "contesto": breve, solo se serve per capire; non dare per scontato che il lettore ricordi i giorni precedenti.
+- "dati": cifre significative con etichetta, valore, periodo di riferimento e fonte. Il periodo deve essere quello indicato dalla fonte (mese, trimestre, anno, data della rilevazione); se la fonte non lo indica scrivi "periodo non indicato dalla fonte", mai la data dell'articolo al posto del periodo. Non mettere a confronto valori non omogenei.
+- "contesto": breve, solo se serve per capire; non dare per scontato che il lettore ricordi i giorni precedenti. Anche il contesto deve venire dai materiali (fonti di oggi o schede precedenti): non aggiungere antefatti presi dalle tue conoscenze.
 - "prossimi_passi": solo se ci sono sviluppi attesi nei materiali; "tipo" tra "ufficiale" (deciso), "programmato" (in calendario), "previsione" (di istituzioni o analisti, da attribuire), "ipotesi". Mai presentare una previsione come certa.
 - Lunghezza proporzionata: notizie semplici brevi; decisioni BCE, manovre, crisi bancarie e riforme più approfondite.
 - Niente morali finali, previsioni artificiose o frasi di riempimento.
