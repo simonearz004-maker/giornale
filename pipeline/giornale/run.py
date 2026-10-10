@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 import traceback
 import uuid
 from dataclasses import dataclass, field
@@ -171,7 +172,9 @@ def run_pipeline(store: BaseStore, cfg: Config, *, fetcher=None, reader=None, ll
     return out
 
 
-def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fetcher, reader, llm_factory):
+def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fetcher, reader, llm_factory,
+             clock=time.monotonic):
+    started = clock()
     today = now_local.date()
     categories = [c for c in store.list_categories() if c.get("enabled")]
     cat_by_slug = {c["slug"]: c for c in categories}
@@ -277,11 +280,19 @@ def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fe
         used_cluster_ids |= set(ev.gruppi)
         chosen.append(ev)
 
-    # 4. Scrittura e verifica
-    for ev in chosen:
+    # 4. Scrittura e verifica (con un tetto di tempo: meglio chiudere con le notizie verificate
+    #    che farsi interrompere da GitHub a metà lavoro)
+    for n_ev, ev in enumerate(chosen):
         cat = cat_by_slug[ev.categoria]
         ev_items = [i for cid in ev.gruppi for i in by_id[cid].items]
         lead_title = by_id[ev.gruppi[0]].lead.title
+        if clock() - started > cfg.max_minutes * 60:
+            out.status = "partial"
+            out.errors.append(f"Tempo massimo di {cfg.max_minutes} minuti raggiunto: pubblicate le notizie già verificate.")
+            for later in chosen[n_ev:]:
+                out.rejections.append({"titolo": by_id[later.gruppi[0]].lead.title,
+                                       "motivo": "Non verificata in tempo in questa edizione."})
+            break
         try:
             materials = build_materials(pick_materials(ev_items), reader, tz)
             previous, thread_id, is_update = [], str(uuid.uuid4()), False
@@ -338,8 +349,10 @@ def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fe
     # 5. Notizie da non perdere
     _update_must_read(store, edition["id"], cat_by_slug, int(settings.get("max_must_read") or 5))
 
-    # 6. Glossario
+    # 6. Glossario (saltato se il tempo è già finito: si recupera all'edizione successiva)
     try:
+        if clock() - started > cfg.max_minutes * 60:
+            raise LLMError("tempo massimo raggiunto")
         _update_glossary(store, llm, [s for s in existing if s.get("id") in set(out.published)], cfg)
     except (AllModelsExhausted, BudgetExhausted, LLMError) as exc:
         out.errors.append(f"Glossario non aggiornato: {exc}")

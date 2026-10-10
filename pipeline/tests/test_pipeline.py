@@ -336,3 +336,25 @@ def test_controllo_fedelta_negativo_esclude():
                        llm_factory=lambda n: LLM([FakeProvider("f", fn)], n, 0, sleep=lambda s: None), now_utc=NOW)
     assert store.stories == []
     assert any("fedeltà" in r["motivo"] for r in out.rejections)
+
+
+def test_tetto_di_tempo():
+    """Superato il tempo massimo, la pipeline chiude con ciò che ha già verificato."""
+    from giornale import run as runmod
+    store = _store()
+    ticks = iter([0] + [10_000] * 50)   # avvio, poi tempo già scaduto alla prima notizia
+    orig = runmod._execute
+
+    def patched(*a, **kw):
+        return orig(*a, clock=lambda: next(ticks), **kw)
+    runmod._execute = patched
+    try:
+        out = run_pipeline(store, Config(force=True), fetcher=_fetcher(store), reader=FakeReader(),
+                           llm_factory=lambda n: LLM([FakeProvider("f", _script())], n, 0, sleep=lambda s: None),
+                           now_utc=NOW)
+    finally:
+        runmod._execute = orig
+    assert out.status == "partial" and store.stories == []
+    assert any("Tempo massimo" in e for e in out.errors)
+    assert any("in tempo" in r["motivo"] for r in out.rejections)
+    assert store.editions, "l'edizione resta registrata anche se parziale"

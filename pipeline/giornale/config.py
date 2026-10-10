@@ -26,6 +26,8 @@ class Config:
     trigger: str = field(default_factory=lambda: os.getenv("RUN_TRIGGER", "schedule"))
     user_agent: str = field(default_factory=lambda: os.getenv(
         "HTTP_USER_AGENT", "IlMioGiornale/1.0 (giornale personale; lettura feed RSS)"))
+    # tetto di tempo per scrivere le schede (il job di GitHub si ferma comunque a 60 minuti)
+    max_minutes: int = field(default_factory=lambda: int(os.getenv("MAX_MINUTES") or "35"))
     max_window_hours: int = 36
     min_relevance: int = 3
     max_new_glossary_terms: int = 6
