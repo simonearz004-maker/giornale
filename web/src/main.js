@@ -160,7 +160,7 @@ async function route() {
   document.body.dataset.route = path === '' ? 'home' : path.split('/')[0];
   const main = $('#main');
   highlightNav(path);
-  window.scrollTo(0, 0);
+  main.scrollTop = 0;
   const found = routes.find(([rx]) => rx.test(path));
   if (!found) {
     main.innerHTML = `<div class="page page--narrow"><h1 class="page__title">Pagina non trovata</h1><p><a href="#/">Torna all'edizione di oggi</a></p></div>`;

@@ -49,10 +49,18 @@ body {
   font-optical-sizing: auto;
   line-height: 1.62;
   -webkit-font-smoothing: antialiased;
-  padding-bottom: calc(68px + env(safe-area-inset-bottom));
 }
-@media (min-width: 860px) { body { padding-bottom: 0; } }
 body.sheet-open { overflow: hidden; }
+
+/* Struttura "a app": la pagina non scorre, scorre solo il contenuto centrale.
+   Così la barra in basso è un normale elemento della pagina e non può più "galleggiare" a metà
+   schermo (difetto di Safari su iPhone con gli elementi position: fixed). */
+html, body { height: 100%; }
+body { overflow: hidden; }
+#app { height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
+#app:not(:has(> main)) { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+#app > main { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+#app > .topbar, #app > .offline, #app > .tabbar { flex: none; }
 
 a { color: var(--pen); text-underline-offset: 0.18em; text-decoration-thickness: 1px; }
 a:hover { text-decoration-thickness: 2px; }
@@ -82,7 +90,7 @@ a.marker:hover { background-size: 100% 1.3em; background-position: 0 0.12em; }
 
 /* ---------- barra superiore ---------- */
 .topbar {
-  position: sticky; top: 0; z-index: 20;
+  position: relative; z-index: 20;
   background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: saturate(1.4) blur(10px);
   -webkit-backdrop-filter: saturate(1.4) blur(10px);
@@ -110,7 +118,7 @@ body[data-route='home'] .brand { visibility: hidden; }
 
 /* barra inferiore (telefono) */
 .tabbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  position: relative; z-index: 20;
   display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--surface); border-top: 1px solid var(--rule);
   padding-bottom: env(safe-area-inset-bottom);
@@ -151,7 +159,7 @@ small { display: block; margin-top: 6px; }
 @media (min-width: 980px) { .home { grid-template-columns: minmax(0, 1fr) 280px; gap: 64px; } }
 .home__main { min-width: 0; max-width: 760px; }
 .home__side { display: grid; gap: 28px; align-content: start; }
-@media (min-width: 980px) { .home__side { position: sticky; top: 84px; } }
+@media (min-width: 980px) { .home__side { position: sticky; top: 24px; } }
 .side-block__title { font-family: var(--sans); font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; }
 .side-block__note { font-family: var(--sans); font-size: 0.82rem; color: var(--ink-2); margin-bottom: 10px; }
 .markers { line-height: 2.1; }

@@ -51,7 +51,7 @@ export function closeStory({ silent = false } = {}) {
     if (history.state?.story) history.back();
     else history.replaceState(null, '', '#/');
   }
-  lastFocus?.focus?.();
+  lastFocus?.focus?.({ preventScroll: true });
 }
 
 export async function renderStoryPage(main, ctx, id) {

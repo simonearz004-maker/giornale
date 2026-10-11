@@ -66,13 +66,18 @@ with sync_playwright() as p:
     check("Homepage: categoria vuota dichiarata", "Nessuno sviluppo rilevante" in page.inner_text("main"))
     check("Homepage: data e ora di aggiornamento", "Aggiornato alle" in page.inner_text(".masthead"))
     check("Tabbar visibile su telefono", page.locator(".tabbar").is_visible())
+    def tabbar_at_bottom():
+        return page.evaluate("Math.abs(document.querySelector('.tabbar').getBoundingClientRect().bottom - window.innerHeight) < 2")
+    page.evaluate("document.querySelector('main').scrollTo(0, 99999)")
+    page.wait_for_timeout(200)
+    check("Barra in basso ancorata al fondo anche dopo lo scorrimento", tabbar_at_bottom())
     page.screenshot(path=f"{SHOTS}/telefono-home.png")
 
     # apertura notizia nel pannello, mantenendo la posizione
-    page.mouse.wheel(0, 1400)
-    page.wait_for_timeout(300)
-    y_before = page.evaluate("scrollY")
     target = page.locator(".block a[data-open]").nth(4)
+    target.scroll_into_view_if_needed()
+    page.wait_for_timeout(300)
+    y_before = page.evaluate("document.querySelector('main').scrollTop")
     title = target.inner_text()
     target.click()
     page.wait_for_selector(".sheet .article__title")
@@ -82,8 +87,9 @@ with sync_playwright() as p:
     page.screenshot(path=f"{SHOTS}/telefono-notizia.png")
     page.keyboard.press("Escape")
     page.wait_for_timeout(400)
-    check("Chiusura del pannello torna allo stesso punto", abs(page.evaluate("scrollY") - y_before) < 5,
-          f"{y_before} -> {page.evaluate('scrollY')}")
+    y_after = page.evaluate("document.querySelector('main').scrollTop")
+    check("Chiusura del pannello torna allo stesso punto", y_before > 500 and abs(y_after - y_before) < 5,
+          f"{y_before} -> {y_after}")
     check("Chiusura riporta all'indirizzo della home", not page.url.split("#")[-1].startswith("/notizia"))
 
     # notizia principale: tutte le parti
