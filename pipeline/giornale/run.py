@@ -6,6 +6,7 @@ Variabili: vedi config.py (FORCE_RUN=1 per eseguire subito, ignorando l'orario).
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import time
 import traceback
@@ -481,7 +482,38 @@ def main() -> int:
     if out.errors:
         for e in out.errors:
             log.warning(e)
+    annotate(out)
     return 1 if out.status == "failed" else 0
+
+
+def _gh(text: str) -> str:
+    # i messaggi delle annotazioni GitHub non possono contenere a capo
+    return str(text).replace("%", "%25").replace("\r", " ").replace("\n", " ")
+
+
+def annotate(out: Outcome) -> None:
+    """Riepilogo visibile nella pagina dell'esecuzione su GitHub (Annotations), senza aprire i log."""
+    if not os.getenv("GITHUB_ACTIONS"):
+        return
+    llm = out.llm
+    reasons: dict[str, int] = {}
+    for r in out.rejections:
+        motivo = r.get("motivo", "")
+        key = ("quota del modello" if "Quota" in motivo or "quota" in motivo else
+               "richieste esaurite" if "insufficienti" in motivo else
+               "tempo esaurito" if "in tempo" in motivo else
+               "numeri non nelle fonti" if "Numeri non presenti" in motivo else
+               "controllo di fedeltà" if "fedeltà" in motivo else
+               "materiale insufficiente" if "insufficiente" in motivo else "altri controlli")
+        reasons[key] = reasons.get(key, 0) + 1
+    detail = ", ".join(f"{k}: {v}" for k, v in sorted(reasons.items(), key=lambda kv: -kv[1])) or "nessuna"
+    summary = (f"Esito {out.status}. Pubblicate {len(out.published)}, escluse {len(out.rejections)} ({detail}). "
+               f"Articoli nuovi {out.items_fetched}, gruppi {out.clusters}. "
+               f"Richieste al modello {llm.used if llm else 0}/{llm.max_requests if llm else 0}"
+               f"{', modelli ' + ', '.join(llm.models_used) if llm and llm.models_used else ''}.")
+    print(f"::notice title=Edizione::{_gh(summary)}")
+    for e in out.errors + (llm.notes if llm else []):
+        print(f"::warning title=Edizione::{_gh(e)}")
 
 
 if __name__ == "__main__":

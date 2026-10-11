@@ -4,7 +4,11 @@ name: Edizione quotidiana
 # (e recupera fino a 6 ore dopo se un'esecuzione salta). Le esecuzioni fuori orario durano pochi secondi.
 on:
   schedule:
-    - cron: "7 * * * *"
+    # GitHub non garantisce l'orario dei job pianificati e a volte li salta: nelle ore del mattino
+    # (04-12 UTC = 05-14 in Italia) si prova ogni 20 minuti, nel resto della giornata ogni ora.
+    # Le esecuzioni in eccesso si chiudono in pochi secondi senza fare nulla.
+    - cron: "*/20 4-12 * * *"
+    - cron: "7 0-3,13-23 * * *"
   workflow_dispatch:
     inputs:
       subito:
