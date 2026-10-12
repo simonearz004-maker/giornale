@@ -17,7 +17,8 @@ Tutto quello che serve per usare e gestire il giornale, in una pagina. Qui non c
 
 ## Come funziona, in breve
 
-- Ogni mattina verso le **7:00** GitHub prepara l'edizione: raccoglie le notizie da 17 fonti, le fa scrivere a Gemini e le controlla. Se l'esecuzione salta, il sistema riprova fino alle 13.
+- Ogni mattina, all'orario scelto nelle Impostazioni, parte l'edizione: raccoglie le notizie da 17 fonti, le fa scrivere a Gemini e le controlla. L'avvio puntuale lo dà Supabase, che ogni 10 minuti controlla l'orario e chiede a GitHub di partire (file `supabase/avvio-automatico.sql`); il pianificatore di GitHub resta come riserva. Se l'edizione non parte, il sistema riprova per 6 ore.
+- Il token di GitHub usato da Supabase ha una scadenza: quando scade, creane uno nuovo (stessi permessi) e riesegui `avvio-automatico.sql` con il token nuovo.
 - **Costo: 0 €.** GitHub, Supabase e il piano gratuito di Gemini non richiedono pagamenti.
 - Ogni numero viene confrontato con le fonti e ogni scheda passa un secondo controllo. Le notizie che non lo superano vengono escluse e restano visibili in *Stato del sistema*.
 - **Bollini di verifica:** *Fonte primaria* (documento ufficiale), *Confermata* (almeno due testate), *Fonte singola* (una sola testata), *Da confermare* (indiscrezione).
