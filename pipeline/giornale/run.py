@@ -327,7 +327,9 @@ def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fe
         refs = cited_refs(card)
         story_sources = [{"ref": m["ref"], "source_name": m["source_name"], "title": m["title"], "url": m["url"],
                           "published_at": m["published_dt"].isoformat() if m["published_dt"] else None,
-                          "is_primary": is_primary(m), "fulltext_used": m["fulltext"]}
+                          "is_primary": is_primary(m), "fulltext_used": m["fulltext"],
+                          # estratto usato per rispondere alle domande sulla notizia (cancellato dopo 30 giorni)
+                          "excerpt": (m["text"] or "")[:6000]}
                          for m in materials if m["ref"] in refs] or []
         story = {
             "edition_id": edition["id"], "edition_date": today.isoformat(),

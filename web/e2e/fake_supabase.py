@@ -20,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
 POSTGREST = os.getenv("POSTGREST_URL", "http://localhost:3000")
+FUNCTIONS = os.getenv("FUNCTIONS_URL", "http://localhost:8000")   # Edge Function servita in locale con Deno
 SECRET = os.getenv("POSTGREST_JWT_SECRET", "segreto-di-prova-lungo-almeno-32-caratteri!!")
 PORT = int(os.getenv("PORT", "8787"))
 USERS = {"io@example.org": "prova-123", "intruso@example.org": "prova-123"}
@@ -103,10 +104,13 @@ class Handler(BaseHTTPRequestHandler):
         return self._json(404, {"msg": "not found"})
 
     def _proxy(self, method: str):
-        url = POSTGREST + self.path[len("/rest/v1"):]
+        if self.path.startswith("/functions/v1/"):
+            url = FUNCTIONS + self.path[len("/functions/v1"):]
+        else:
+            url = POSTGREST + self.path[len("/rest/v1"):]
         headers = {k: v for k, v in self.headers.items()
                    if k.lower() in {"authorization", "prefer", "content-type", "accept", "range", "range-unit",
-                                    "accept-profile", "content-profile"}}
+                                    "accept-profile", "content-profile", "apikey"}}
         if "authorization" not in {k.lower() for k in headers} and self.headers.get("apikey"):
             headers["Authorization"] = "Bearer " + self.headers["apikey"]
         body = self._body() if method in ("POST", "PATCH", "PUT", "DELETE") else None
@@ -128,7 +132,7 @@ class Handler(BaseHTTPRequestHandler):
     def _route(self, method):
         if self.path.startswith("/auth/v1/"):
             return self._auth(method)
-        if self.path.startswith("/rest/v1/"):
+        if self.path.startswith("/rest/v1/") or self.path.startswith("/functions/v1/"):
             return self._proxy(method)
         return self._json(404, {"msg": "not found"})
 

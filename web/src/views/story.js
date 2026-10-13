@@ -1,4 +1,5 @@
 import * as api from '../api.js';
+import { askSection, bindAsk } from './ask.js';
 import { ICONS } from '../icons.js';
 import { $, esc, fmtDay, fmtDateTime, safeUrl, toast, verificationBadge, relevanceMarks, VERIFICATION, errorBox } from '../ui.js';
 
@@ -84,6 +85,7 @@ async function fillStory(container, ctx, id) {
     <div class="article__actions">
       <button class="btn" id="btn-save" aria-pressed="${state.saved ? 'true' : 'false'}">${ICONS.bookmark}<span>${state.saved ? 'Salvata' : 'Salva'}</span></button>
       <button class="btn" id="btn-share">${ICONS.share}<span>Condividi</span></button>
+      <a class="btn" href="#ask" id="btn-ask">${ICONS.chat}<span>Chiedi</span></a>
     </div>
 
     ${s.why_important?.length ? `<section class="part">
@@ -122,6 +124,8 @@ async function fillStory(container, ctx, id) {
       <p class="part__note">Ogni affermazione principale con la fonte che la sostiene.</p>
       <ul class="claims">${s.claims.map((c) => `<li><span class="claims__nature">${esc(NATURE[c.natura] || 'Fatto')}</span> ${esc(c.testo)} ${cite(c.fonti)}</li>`).join('')}</ul>
     </section>` : ''}
+
+    ${askSection(id)}
 
     <section class="part sources" aria-labelledby="h-sources">
       <h2 id="h-sources">Fonti</h2>
@@ -171,10 +175,16 @@ async function fillStory(container, ctx, id) {
       /* condivisione annullata */
     }
   });
-  container.querySelectorAll('a.cite').forEach((a) => a.addEventListener('click', (e) => {
+  // collegamenti alle fonti [S1] (anche quelli che compaiono dopo, nelle risposte dell'IA)
+  container.addEventListener('click', (e) => {
+    const a = e.target.closest('a.cite, #btn-ask');
+    if (!a) return;
     e.preventDefault();
-    container.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }));
+    const target = container.querySelector(a.getAttribute('href'));
+    target?.scrollIntoView({ behavior: 'smooth', block: a.id === 'btn-ask' ? 'start' : 'center' });
+    if (a.id === 'btn-ask') setTimeout(() => container.querySelector('#ask-input')?.focus({ preventScroll: true }), 400);
+  });
+  bindAsk(container, id);
 }
 
 function paragraphs(text) {

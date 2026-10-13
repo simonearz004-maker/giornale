@@ -29,6 +29,10 @@ Tutto quello che serve per usare e gestire il giornale, in una pagina. Qui non c
 - **Stato del sistema** (Altro → Stato del sistema): esito degli aggiornamenti, fonti che non rispondono, notizie escluse e perché.
 - **Salvate, Cronologia, Glossario, Archivio, Cerca.**
 
+## Domande all'IA sulle notizie
+
+In fondo a ogni notizia (o con il pulsante **Chiedi**) puoi fare domande: l'IA risponde partendo dalla scheda e dalle fonti, citandole tra parentesi. Usa una **chiave Gemini separata** (secret `GEMINI_CHAT_KEY`, in un progetto Google diverso), quindi non toglie quota alle edizioni. Il numero massimo di domande al giorno si cambia nelle Impostazioni. Le risposte non passano i controlli delle schede: per i dati fa fede la fonte.
+
 ## Se serve un'edizione subito
 
 GitHub → **Actions** → **Edizione quotidiana** → **Run workflow** → pulsante verde. Ci vogliono 10-30 minuti.

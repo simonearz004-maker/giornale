@@ -127,10 +127,24 @@ class SupabaseStore(BaseStore):
     def stories_for_edition(self, edition_id: str) -> list[dict]:
         return self._get("stories", {"edition_id": f"eq.{edition_id}", "select": "*"})
 
+    def _insert_sources(self, rows: list[dict]) -> None:
+        """Inserisce le fonti; se il database non ha ancora la colonna 'excerpt' (supabase/domande.sql
+        non eseguito) le salva senza estratto invece di far fallire l'edizione."""
+        if not rows:
+            return
+        if not getattr(self, "_no_excerpt", False):
+            try:
+                self._insert("story_sources", rows)
+                return
+            except StoreError as exc:
+                if "excerpt" not in str(exc):
+                    raise
+                self._no_excerpt = True
+        self._insert("story_sources", [{k: v for k, v in r.items() if k != "excerpt"} for r in rows])
+
     def insert_story(self, story: dict, sources: list[dict]) -> str:
         row = self._insert("stories", story)[0]
-        if sources:
-            self._insert("story_sources", [{**s, "story_id": row["id"]} for s in sources])
+        self._insert_sources([{**s, "story_id": row["id"]} for s in sources])
         return row["id"]
 
     def update_story(self, story_id: str, fields: dict) -> None:
@@ -139,8 +153,7 @@ class SupabaseStore(BaseStore):
     def replace_story(self, story_id: str, story: dict, sources: list[dict]) -> None:
         self._patch("stories", {"id": f"eq.{story_id}"}, story)
         self._req("DELETE", "/story_sources", params={"story_id": f"eq.{story_id}"})
-        if sources:
-            self._insert("story_sources", [{**src, "story_id": story_id} for src in sources])
+        self._insert_sources([{**src, "story_id": story_id} for src in sources])
 
     def glossary_all(self) -> list[dict]:
         return self._get("glossary", {"select": "id,slug,term,aliases"})

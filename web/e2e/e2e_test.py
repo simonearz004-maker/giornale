@@ -47,7 +47,7 @@ with sync_playwright() as p:
         page = ctx.new_page()
         page.on("pageerror", lambda e: console_errors.append(str(e)))
         if track:  # l'utente senza permessi produce volutamente risposte 406 dal database
-            page.on("console", lambda m: m.type == "error" and "400" not in m.text and "INTERNET_DISCONNECTED" not in m.text
+            page.on("console", lambda m: m.type == "error" and "400" not in m.text and "INTERNET_DISCONNECTED" not in m.text and "429" not in m.text
                     and console_errors.append(m.text))
         return ctx, page
 
@@ -261,6 +261,38 @@ with sync_playwright() as p:
     page.wait_for_selector(".story--lead")
     page.wait_for_timeout(400)
     page.screenshot(path=f"{SHOTS}/telefono-home-scuro.png")
+    ctx.close()
+
+    # domande all'IA sulla notizia
+    sql("delete from story_questions; update settings set max_questions_per_day=2")
+    ctx, page = new_page({"width": 390, "height": 844}, 2)
+    login(page)
+    page.wait_for_selector(".story--lead")
+    page.click(".story--lead a[data-open]")
+    page.wait_for_selector(".sheet #ask")
+    page.wait_for_timeout(500)
+    check("Domande: pannello presente con domande suggerite", page.locator(".sheet .chip-btn").count() == 4)
+    check("Domande: conteggio iniziale", "2 domande su 2" in page.inner_text("#ask-meta"), page.inner_text("#ask-meta"))
+    page.click(".sheet .chip-btn >> nth=0")
+    page.wait_for_selector(".sheet .ask__item:not(.ask__item--pending) .ask__a", timeout=15000)
+    ans = page.inner_text(".sheet .ask__item .ask__a")
+    check("Domande: risposta mostrata", "Spiegamelo in modo più semplice" in ans, ans[:120])
+    check("Domande: fonte citata come collegamento", page.locator(".sheet .ask__a a.cite[href='#src-S1']").count() == 1)
+    check("Domande: conteggio aggiornato", "1 domande su 2" in page.inner_text("#ask-meta"))
+    page.fill("#ask-input", "Che cosa vuol dire?")
+    page.press("#ask-input", "Enter")
+    page.wait_for_timeout(2500)
+    page.fill("#ask-input", "Terza domanda oltre il limite")
+    page.click("#ask-send")
+    page.wait_for_selector(".sheet .ask__error", timeout=15000)
+    check("Domande: limite giornaliero rispettato", "tutte le 2 domande" in page.inner_text(".sheet .ask__error"))
+    page.locator(".sheet").screenshot(path=f"{SHOTS}/telefono-domande.png")
+    page.keyboard.press("Escape")
+    page.wait_for_timeout(300)
+    page.click(".story--lead a[data-open]")
+    page.wait_for_selector(".sheet .ask__item", timeout=8000)
+    check("Domande: storico conservato", page.locator(".sheet .ask__item").count() == 2)
+    check("Domande salvate nel database", sql("select count(*) from story_questions") == "2")
     ctx.close()
 
     # un altro utente registrato non vede nulla

@@ -39,6 +39,9 @@ export async function renderSettings(main, ctx) {
         <div class="hours">${HOURS.map((h) => `<label><input type="checkbox" name="hour" value="${h}" ${hours.has(h) ? 'checked' : ''} /><span>${String(h).padStart(2, '0')}:00</span></label>`).join('')}</div>
         <small>Puoi scegliere fino a 3 orari. Ogni aggiornamento usa la quota gratuita di Gemini: con più orari, ciascuna edizione avrà meno notizie a disposizione. Gli orari possono slittare di qualche minuto.</small>
       </fieldset>
+      ${s.max_questions_per_day !== undefined ? `<label class="field"><span>Domande all'IA al giorno</span>
+        <input id="s-questions" type="number" min="0" max="500" value="${esc(s.max_questions_per_day)}" />
+        <small>Le domande usano una chiave Gemini separata: non tolgono quota alle edizioni. 0 per disattivarle.</small></label>` : ''}
       <label class="field"><span>Notizie da non perdere</span>
         <select id="s-must">${[3, 4, 5, 6, 7, 8].map((n) => `<option ${n === s.max_must_read ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
     </section>
@@ -178,6 +181,11 @@ function bind(main, ctx) {
   }));
 
   $('#s-must').addEventListener('change', (e) => save(api.updateSettings({ max_must_read: Number(e.target.value) })));
+  $('#s-questions')?.addEventListener('change', (e) => {
+    const n = Math.max(0, Math.min(500, Math.round(Number(e.target.value) || 0)));
+    e.target.value = n;
+    save(api.updateSettings({ max_questions_per_day: n }));
+  });
 
   // Sezioni
   $$('.cat', main).forEach((li) => {

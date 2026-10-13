@@ -376,3 +376,21 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--pen); outli
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 @media (min-width: 860px) { #toast { bottom: 28px; } }
 @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+
+/* ---------- domande all'IA ---------- */
+.ask { border-top: 2px solid var(--ink); padding-top: 14px; }
+.ask__thread { display: grid; gap: 18px; margin: 14px 0; }
+.ask__thread:empty { display: none; }
+.ask__q { font-family: var(--sans); font-weight: 600; font-size: 0.95rem; margin: 0 0 6px; padding-left: 12px; border-left: 3px solid var(--marker); }
+.ask__a p { margin: 0 0 0.6em; }
+.ask__when { font-family: var(--sans); font-size: 0.75rem; color: var(--ink-2); margin: 0; }
+.ask__thinking { color: var(--ink-2); font-style: italic; }
+.ask__error { color: var(--rumor); font-family: var(--sans); font-size: 0.9rem; }
+.ask__chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.chip-btn { font-family: var(--sans); font-size: 0.85rem; color: var(--ink); background: var(--surface); border: 1px solid var(--rule);
+  border-radius: 999px; padding: 6px 12px; min-height: 36px; cursor: pointer; text-align: left; }
+.chip-btn:hover { border-color: var(--ink); }
+.ask__form { display: flex; gap: 8px; align-items: flex-end; }
+.ask__form textarea { flex: 1; min-height: 48px; }
+.ask__meta { font-family: var(--sans); font-size: 0.8rem; color: var(--ink-2); margin: 8px 0 0; }
+@media (max-width: 560px) { .ask__form { flex-direction: column; align-items: stretch; } }

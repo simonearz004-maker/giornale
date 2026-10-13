@@ -104,7 +104,7 @@ export async function signOut() {
 // Lettura
 // ---------------------------------------------------------------------------
 const STORY_LIST = 'id,edition_date,category_slug,title,summary,relevance,is_must_read,is_update,verification_level,terms,created_at,event_date';
-const STORY_FULL = '*,story_sources(*),glossary_story_links(glossary(slug,term,simple_definition))';
+const STORY_FULL = '*,story_sources(ref,source_name,title,url,published_at,is_primary,fulltext_used),glossary_story_links(glossary(slug,term,simple_definition))';
 
 export const getSettings = () => cached('settings', () => sb.from('settings').select('*').eq('id', 1).single());
 export const getCategories = () =>
@@ -205,3 +205,52 @@ export const createCategory = (fields) => must(sb.from('categories').insert({ ..
 export const deleteCategory = (id) => must(sb.from('categories').delete().eq('id', id));
 export const updateSource = (id, fields) => must(sb.from('sources').update(fields).eq('id', id));
 export const createSource = (fields) => must(sb.from('sources').insert(fields));
+
+// ---------------------------------------------------------------------------
+// Domande all'IA
+// ---------------------------------------------------------------------------
+function romeMidnightIso() {
+  const now = new Date();
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome' }).format(now);
+  const off = new Intl.DateTimeFormat('en-US', { timeZone: 'Europe/Rome', timeZoneName: 'shortOffset' })
+    .formatToParts(now).find((p) => p.type === 'timeZoneName')?.value || 'GMT+1';
+  const m = off.match(/GMT([+-])(\d{1,2})/);
+  const hours = m ? (m[1] === '-' ? -1 : 1) * Number(m[2]) : 1;
+  return new Date(new Date(`${day}T00:00:00Z`).getTime() - hours * 3600000).toISOString();
+}
+
+export async function getQuestions(storyId) {
+  const [list, count, settings] = await Promise.all([
+    sb.from('story_questions').select('question,answer,created_at').eq('story_id', storyId).eq('status', 'ok').order('created_at'),
+    sb.from('story_questions').select('id', { count: 'exact', head: true }).gte('created_at', romeMidnightIso()),
+    sb.from('settings').select('max_questions_per_day').eq('id', 1).maybeSingle(),
+  ]);
+  const err = list.error || count.error || settings.error;
+  if (err) {
+    const e = new Error(err.message);
+    if (/story_questions|max_questions_per_day|does not exist|schema cache/i.test(err.message)) e.code = 'non_attive';
+    throw e;
+  }
+  const limit = settings.data?.max_questions_per_day ?? 30;
+  return { items: list.data || [], remaining: Math.max(0, limit - (count.count || 0)), limit };
+}
+
+export async function askQuestion(storyId, question) {
+  if (!navigator.onLine) throw new Error('Per fare domande serve la connessione.');
+  const { data, error } = await sb.functions.invoke('chiedi', { body: { story_id: storyId, question } });
+  if (!error) return data;
+  let message = 'L\'IA non ha risposto. Riprova tra poco.';
+  const res = error.context;
+  if (res && typeof res.json === 'function') {
+    if (res.status === 404) message = 'Le domande non sono ancora attive (la funzione non è pubblicata).';
+    else {
+      try {
+        const body = await res.json();
+        if (body?.error) message = body.error;
+      } catch (e) { /* risposta non leggibile */ }
+    }
+  } else if (/fetch|network/i.test(String(error.message))) {
+    message = 'Connessione assente o servizio non raggiungibile.';
+  }
+  throw new Error(message);
+}
