@@ -409,3 +409,27 @@ def test_seguito_stesso_giorno_aggiorna_la_scheda():
     assert st["title"].endswith("confermato il dato di settembre")
     assert any("aggiornata" in n for n in st["verification_notes"])
     assert [x["url"] for x in store.story_sources] == ["https://www.istat.it/x2"]
+
+
+def test_risposte_imperfette_del_modello():
+    """Lista invece di oggetto, spiegazione incompleta, JSON sempre sbagliato: l'edizione non deve fallire."""
+    from giornale.schemas import Controllo
+    llm = LLM([FakeProvider("lite", lambda s, u: '[{"fedele": true, "problemi": []}]')], 5, 0, sleep=lambda s: None)
+    assert llm.json("x", "y", Controllo)[0].fedele is True
+
+    store = _store()
+    calls = {"n": 0}
+
+    def fn(system, user):
+        if system == prompts.CARD_SYSTEM:
+            calls["n"] += 1
+            if "Banca X" in user:
+                return '{"titolo": 5}'                      # sempre non valido -> esclusa, non crash
+            card = good_card(spiegazione={"titolo": "Che cos'è l'inflazione"})   # manca il testo
+            return json.dumps([card])                       # e per di più dentro una lista
+        return _script()(system, user)
+    out = run_pipeline(store, Config(force=True), fetcher=_fetcher(store), reader=FakeReader(),
+                       llm_factory=lambda n: LLM([FakeProvider("lite", fn)], n, 0, sleep=lambda s: None), now_utc=NOW)
+    assert out.status == "success", out.errors
+    assert len(store.stories) == 1 and store.stories[0]["explainer"] is None
+    assert any("non valida" in r["motivo"] for r in out.rejections)

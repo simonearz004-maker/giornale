@@ -14,6 +14,8 @@ INSUFFICIENT = "materiale insufficiente"
 
 
 def normalize_card(card: Scheda) -> Scheda:
+    if card.spiegazione is not None and not card.spiegazione.testo.strip():
+        card.spiegazione = None
     for i in card.perche_importa:
         if i.stato not in VALID_STATO:
             i.stato = "possibile"

@@ -315,6 +315,10 @@ def _execute(store, cfg, settings, tz, now_utc, now_local, run, out: Outcome, fe
         except LLMError as exc:
             out.rejections.append({"titolo": lead_title, "motivo": f"Errore del modello: {exc}"})
             continue
+        except Exception as exc:  # errore imprevisto su una sola notizia: si esclude e si prosegue
+            log.exception("Errore sulla notizia %s", lead_title)
+            out.rejections.append({"titolo": lead_title, "motivo": f"Errore interno: {type(exc).__name__}: {str(exc)[:200]}"})
+            continue
         if card is None:
             out.rejections.append({"titolo": lead_title, "motivo": reason})
             continue

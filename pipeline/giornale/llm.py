@@ -192,15 +192,28 @@ class LLM:
         raise AllModelsExhausted("Tutti i modelli disponibili hanno esaurito la quota: " + "; ".join(self.notes))
 
     def json(self, system: str, user: str, model: type[T]) -> tuple[T, str]:
-        """Chiede un JSON e lo valida; se non è valido riprova una volta spiegando l'errore."""
+        """Chiede un JSON e lo valida; se non è valido riprova una volta spiegando l'errore.
+        Se anche il secondo tentativo non è valido solleva LLMError (la notizia viene esclusa,
+        l'edizione prosegue)."""
         text, name = self._raw(system, user)
         try:
-            return model.model_validate(parse_json(text)), name
+            return _validate(model, text), name
         except (ValueError, ValidationError) as exc:
-            fix = (f"{user}\n\nATTENZIONE: la risposta precedente non era un JSON valido secondo lo schema "
-                   f"({str(exc)[:400]}). Restituisci solo il JSON corretto.")
+            fix = (f"{user}\n\nATTENZIONE: la risposta precedente non rispettava lo schema "
+                   f"({str(exc)[:400]}). Restituisci un solo oggetto JSON, completo di tutti i campi richiesti.")
             text, name = self._raw(system, fix)
-            return model.model_validate(parse_json(text)), name
+            try:
+                return _validate(model, text), name
+            except (ValueError, ValidationError) as exc2:
+                raise LLMError(f"Risposta non valida da {name} anche dopo la correzione: {str(exc2)[:200]}") from exc2
+
+
+def _validate(model, text: str):
+    data = parse_json(text)
+    # alcuni modelli restituiscono [ {...} ] invece di {...}
+    if isinstance(data, list) and len(data) == 1 and isinstance(data[0], dict):
+        data = data[0]
+    return model.model_validate(data)
 
 
 def build_llm(cfg, max_requests: int, sleep=time.sleep) -> LLM:

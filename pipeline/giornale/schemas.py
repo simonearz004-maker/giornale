@@ -31,8 +31,8 @@ class Impatto(BaseModel):
 
 
 class Spiegazione(BaseModel):
-    titolo: str
-    testo: str
+    titolo: str = ""
+    testo: str = ""
 
 
 class Dato(BaseModel):
