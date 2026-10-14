@@ -1,0 +1,31 @@
+name: Diagnosi domande
+
+# Controlla, senza mostrare chiavi, che la funzione "chiedi" sia raggiungibile e che la chiave
+# Gemini delle domande funzioni. Esito nelle annotazioni dell'esecuzione.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnosi:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Funzione e chiave Gemini
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          ANON: ${{ secrets.SUPABASE_ANON_KEY }}
+          GEMINI_CHAT_KEY: ${{ secrets.GEMINI_CHAT_KEY }}
+        run: |
+          code=$(curl -s -o fn.txt -w '%{http_code}' -X POST "$SUPABASE_URL/functions/v1/chiedi" \
+            -H "apikey: $ANON" -H 'content-type: application/json' -d '{}')
+          echo "::notice title=Funzione chiedi::HTTP $code $(head -c 300 fn.txt | tr '\n' ' ')"
+          for m in gemini-3.8-flash gemini-3.6-flash gemini-3.5-flash-lite gemini-3.1-flash-lite; do
+            code=$(curl -s -o g.txt -w '%{http_code}' -X POST \
+              "https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent" \
+              -H "x-goog-api-key: $GEMINI_CHAT_KEY" -H 'content-type: application/json' \
+              -d '{"contents":[{"role":"user","parts":[{"text":"Rispondi solo: ok"}]}],"generationConfig":{"maxOutputTokens":2048}}')
+            msg=$(python3 -c "import json;d=json.load(open('g.txt'));print((d.get('error') or {}).get('message','')[:200] or ''.join(p.get('text','') for p in d['candidates'][0]['content']['parts'] if not p.get('thought'))[:60])" 2>/dev/null)
+            echo "::notice title=Gemini $m::HTTP $code $msg"
+          done

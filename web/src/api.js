@@ -255,9 +255,11 @@ export async function askQuestion(storyId, question) {
     if (res.status === 404) message = 'Le domande non sono ancora attive (la funzione non è pubblicata).';
     else {
       try {
-        const body = await res.json();
-        if (body?.error) message = body.error;
-      } catch (e) { /* risposta non leggibile */ }
+        const body = await res.clone().json();
+        message = body?.error || body?.message || body?.msg || `Errore ${res.status}${body?.code ? ` (${body.code})` : ''}.`;
+      } catch (e) {
+        message = `Errore ${res.status} dal servizio delle domande.`;
+      }
     }
   } else if (/fetch|network/i.test(String(error.message))) {
     message = 'Connessione assente o servizio non raggiungibile.';
