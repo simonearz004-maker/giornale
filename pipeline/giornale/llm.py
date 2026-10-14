@@ -31,6 +31,10 @@ class ModelUnavailable(LLMError):
     """Modello inesistente o non abilitato per questa chiave."""
 
 
+class ModelBusy(LLMError):
+    """Modello sovraccarico (errori 5xx ripetuti): per questa richiesta si prova il successivo."""
+
+
 class AllModelsExhausted(LLMError):
     pass
 
@@ -94,9 +98,11 @@ class GeminiProvider:
             if r.status_code in (400, 403, 404) and ("not found" in body.lower() or "not supported" in body.lower()
                                                      or "permission" in body.lower()):
                 raise ModelUnavailable(f"{self.model}: {r.status_code} {body[:200]}")
-            if r.status_code >= 500 and attempt < 3:
-                sleep(10 * (attempt + 1))
-                continue
+            if r.status_code >= 500:
+                if attempt < 3:
+                    sleep(10 * (attempt + 1))
+                    continue
+                raise ModelBusy(f"{self.model}: sovraccarico (HTTP {r.status_code})")
             raise LLMError(f"{self.model}: HTTP {r.status_code} {body[:300]}")
         raise LLMError(f"{self.model}: tentativi esauriti")
 
@@ -186,10 +192,16 @@ class LLM:
                 self.notes.append(str(exc))
                 log.warning("Passo al modello successivo: %s", exc)
                 continue
+            except ModelBusy as exc:
+                # sovraccarico temporaneo: per questa richiesta si usa il modello successivo,
+                # ma il modello resta disponibile per le richieste dopo
+                self.notes.append(str(exc))
+                log.warning("Modello sovraccarico, provo il successivo: %s", exc)
+                continue
             if p.name not in self.models_used:
                 self.models_used.append(p.name)
             return text, p.name
-        raise AllModelsExhausted("Tutti i modelli disponibili hanno esaurito la quota: " + "; ".join(self.notes))
+        raise AllModelsExhausted("Nessun modello disponibile (quota esaurita o sovraccarico): " + "; ".join(self.notes[-6:]))
 
     def json(self, system: str, user: str, model: type[T]) -> tuple[T, str]:
         """Chiede un JSON e lo valida; se non è valido riprova una volta spiegando l'errore.

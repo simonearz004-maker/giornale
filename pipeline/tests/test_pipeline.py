@@ -14,7 +14,7 @@ import pytest
 from giornale import prompts
 from giornale.config import Config
 from giornale.feeds import FeedResult, Item, parse_feed
-from giornale.llm import (LLM, AllModelsExhausted, BudgetExhausted, GeminiProvider, ModelExhausted, parse_json)
+from giornale.llm import (LLM, AllModelsExhausted, BudgetExhausted, GeminiProvider, ModelBusy, ModelExhausted, parse_json)
 from giornale.run import gate, run_pipeline
 from giornale.schemas import Scheda
 from giornale.store import MemoryStore
@@ -159,6 +159,29 @@ def test_passaggio_al_modello_di_riserva():
     from giornale.schemas import Controllo
     res, name = llm.json("x", "y", Controllo)
     assert res.fedele and name == "b" and "a" in llm.dead
+
+
+def test_modello_sovraccarico_non_blocca_l_edizione():
+    """14/10: un 503 persistente sul primo modello aveva fatto fallire la selezione."""
+    from giornale.schemas import Controllo
+    calls = {"a": 0}
+
+    def busy_then_ok(s, u):
+        calls["a"] += 1
+        if calls["a"] == 1:
+            raise ModelBusy("a: sovraccarico (HTTP 503)")
+        return '{"fedele": true}'
+
+    llm = LLM([FakeProvider("a", busy_then_ok), FakeProvider("b", lambda s, u: '{"fedele": true}')],
+              max_requests=5, min_interval=0, sleep=lambda s: None)
+    _, name = llm.json("x", "y", Controllo)
+    assert name == "b" and "a" not in llm.dead          # si passa al successivo...
+    _, name = llm.json("x", "y", Controllo)
+    assert name == "a"                                   # ...ma il primo resta disponibile
+    # Gemini simulato: 503 ripetuti -> ModelBusy (non un errore che ferma tutto)
+    client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(503, text="high demand")))
+    with pytest.raises(ModelBusy):
+        GeminiProvider("k", "m", client=client).generate("s", "u", sleep=lambda s: None)
 
 
 def test_tutti_esauriti_e_budget():
