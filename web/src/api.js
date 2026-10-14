@@ -237,7 +237,17 @@ export async function getQuestions(storyId) {
 
 export async function askQuestion(storyId, question) {
   if (!navigator.onLine) throw new Error('Per fare domande serve la connessione.');
-  const { data, error } = await sb.functions.invoke('chiedi', { body: { story_id: storyId, question } });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90000);
+  let data, error;
+  try {
+    ({ data, error } = await sb.functions.invoke('chiedi', { body: { story_id: storyId, question }, signal: ctrl.signal }));
+  } catch (e) {
+    error = e;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (ctrl.signal.aborted) throw new Error('L\'IA ci sta mettendo troppo a rispondere. Riprova tra poco.');
   if (!error) return data;
   let message = 'L\'IA non ha risposto. Riprova tra poco.';
   const res = error.context;

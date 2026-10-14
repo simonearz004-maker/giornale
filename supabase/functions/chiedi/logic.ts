@@ -155,7 +155,8 @@ export function geminiGenerate(apiKey: string, fetchImpl: typeof fetch = fetch,
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts: [{ text: user }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 1200 },
+          // margine ampio: nei modelli che "ragionano" il ragionamento consuma parte dei token
+          generationConfig: { temperature: 0.3, maxOutputTokens: 4096 },
         }),
       });
     } catch (e) {
