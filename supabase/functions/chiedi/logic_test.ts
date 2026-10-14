@@ -84,6 +84,20 @@ Deno.test("mezzanotte italiana in UTC (ora legale e solare)", () => {
   assert(startOfTodayRome(new Date("2026-10-12T23:30:00Z")) === "2026-10-12T22:00:00.000Z"); // 01:30 del 13 a Roma
 });
 
+Deno.test("modelli sovraccarichi o lenti: si passa al successivo", async () => {
+  const slow = (async (_u: string, init: RequestInit) => {
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(resolve, 5000);
+      init.signal?.addEventListener("abort", () => { clearTimeout(t); reject(init.signal!.reason); });
+    });
+    return new Response("{}");
+  }) as unknown as typeof fetch;
+  const r = await geminiGenerate("k", slow, "http://x", 50)("m", "s", "u");
+  assert(!r.ok && r.kind === "unavailable" && /30 secondi/.test(r.detail));
+  const busy: Generate = async () => ({ ok: false, kind: "unavailable", detail: "modello sovraccarico o non disponibile (503)" });
+  await rejects(answerQuestion({ story_id: ID, question: "perché?" }, fakeDb().db, busy, ["m1", "m2"]), 503, "sovraccarichi");
+});
+
 Deno.test("Gemini: testo, quota, modello inesistente", async () => {
   const fake = (status: number, body: unknown) => (async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status })) as unknown as typeof fetch;
   const ok = await geminiGenerate("k", fake(200, { candidates: [{ content: { parts: [{ text: "pensiero", thought: true }, { text: "Ciao" }] } }] }))("m", "s", "u");

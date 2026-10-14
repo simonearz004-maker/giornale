@@ -140,16 +140,20 @@ export async function answerQuestion(
   }
   const allQuota = notes.length > 0 && notes.every((n) => /quota|429/i.test(n));
   if (allQuota) throw new HttpError(429, "La quota gratuita di Gemini per le domande è finita per oggi. Riprova dopo le 9:00.");
+  const allBusy = notes.length > 0 && notes.every((n) => /sovraccarico|entro 30 secondi|non disponibile/i.test(n));
+  if (allBusy) throw new HttpError(503, "I modelli di Gemini sono sovraccarichi in questo momento. Riprova tra qualche minuto.");
   throw new HttpError(502, "L'IA non ha risposto. Riprova tra poco. (" + notes.join("; ").slice(0, 300) + ")");
 }
 
 /** Chiamata reale a Gemini. */
 export function geminiGenerate(apiKey: string, fetchImpl: typeof fetch = fetch,
-  base = "https://generativelanguage.googleapis.com"): Generate {
+  base = "https://generativelanguage.googleapis.com", timeoutMs = 30000): Generate {
   return async (model, system, user) => {
     let res: Response;
     try {
       res = await fetchImpl(`${base}/v1beta/models/${model}:generateContent`, {
+        // un modello sovraccarico non deve bloccare la risposta: dopo 30 secondi si passa al successivo
+        signal: AbortSignal.timeout(timeoutMs),
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
@@ -160,7 +164,8 @@ export function geminiGenerate(apiKey: string, fetchImpl: typeof fetch = fetch,
         }),
       });
     } catch (e) {
-      return { ok: false, kind: "error", detail: `rete: ${String(e).slice(0, 120)}` };
+      const timedOut = e instanceof DOMException && (e.name === "TimeoutError" || e.name === "AbortError");
+      return { ok: false, kind: "unavailable", detail: timedOut ? "nessuna risposta entro 30 secondi" : `rete: ${String(e).slice(0, 120)}` };
     }
     const body = await res.text();
     if (res.status === 200) {
@@ -177,7 +182,7 @@ export function geminiGenerate(apiKey: string, fetchImpl: typeof fetch = fetch,
     if ([400, 403, 404].includes(res.status) && /not found|not supported|permission/i.test(body)) {
       return { ok: false, kind: "unavailable", detail: `modello non disponibile (${res.status})` };
     }
-    if (res.status >= 500) return { ok: false, kind: "unavailable", detail: `errore del servizio (${res.status})` };
+    if (res.status >= 500) return { ok: false, kind: "unavailable", detail: `modello sovraccarico o non disponibile (${res.status})` };
     return { ok: false, kind: "error", detail: `HTTP ${res.status}: ${body.slice(0, 150)}` };
   };
 }
